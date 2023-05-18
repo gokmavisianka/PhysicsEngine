@@ -315,7 +315,7 @@ class Game:
 game = Game()
 circles = Circles()
 screen = Screen(background_color=(255, 255, 255), resolution=(1000, 1000))
-grid_map = GridMap(size=(10, 10))  # 20 = 1000 / 50, size = resolution / radius
+grid_map = GridMap(size=(10, 10))
 transform = Transform()
 collision = Collision()
 game.setup()
