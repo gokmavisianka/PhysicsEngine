@@ -1,27 +1,3 @@
-"""
-MIT License
-
-Copyright (c) 2023 Rasim Mert YILDIRIM
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-"""
-
 import pygame
 import numpy as np
 import math
@@ -200,18 +176,23 @@ class Circles:
 
     def draw_all(self):
         for circle in self.elements:
-            circle.update()
             circle.draw()
+
+    def update_all(self):
+        for circle in self.elements:
+            circle.update()
 
 
 class Circle:
     def __init__(self, position, radius, color=(0, 50, 200)):
         self.linear = Linear()
         self.linear.position[:] = position
+        self.linear.velocity[:] = (randint(-10, 10), randint(-10, 10))
         self.radius = radius
         self.color = random_color()
         self.mass = 1
         self.moment = self.mass * self.radius ** 2
+        circles.elements.append(self)
 
     def update(self):
         self.linear.velocity += self.linear.acceleration
@@ -221,17 +202,78 @@ class Circle:
         pygame.draw.circle(screen.display, self.color, self.linear.position, self.radius)
 
 
+class GridMap:
+    def __init__(self, size: tuple[int, int]):
+        self.rows, self.columns = size
+        self.cell_width = screen.width / self.columns
+        self.cell_height = screen.height / self.rows
+        self.dictionary = {}
+
+    def update_keys(self, circles):
+        for circle in circles:
+            self.dictionary[circle] = (None, None)
+
+    def update_values(self, circles):
+        for circle in circles:
+            x, y = circle.linear.position
+            row = y // self.cell_height
+            column = x // self.cell_width
+            self.dictionary[circle] = (row, column)
+
+    def find_neighboring_cells(self, row, column):
+        neighboring_cells = [(row - 1, column), (row + 1, column),
+                             (row, column - 1), (row, column + 1),
+                             (row - 1, column - 1), (row + 1, column - 1),
+                             (row - 1, column + 1), (row + 1, column + 1)]
+        
+        return neighboring_cells
+
+    def find_circles_in_a_cell(self, row, column):
+        circles = []
+        for circle, position in self.dictionary.items():
+            if position == (row, column):
+                circles.append(circle)
+
+        return circles
+
+    def check_collision_for_all(self):
+        for circle in self.dictionary:
+            collision.check_for_screen_borders(circle)
+        for row in range(self.rows):
+            for column in range(self.columns):
+                circles = self.find_circles_in_a_cell(row, column)
+                if len(circles) != 0:
+                    neighboring_cells = self.find_neighboring_cells(row, column)
+                    if len(circles) > 1:
+                        for circle_1 in circles:
+                            for circle_2 in circles:
+                                if circle_1 != circle_2:
+                                    if collision.check(circle_1, circle_2) is True:
+                                        collision.response(circle_1, circle_2)
+                        for neighboring_cell in neighboring_cells:
+                            n_row, n_column = neighboring_cell
+                            neighboring_circles = self.find_circles_in_a_cell(n_row, n_column)
+                            for circle in circles:
+                                for neighboring_circle in neighboring_circles:
+                                    if collision.check(circle, neighboring_circle) is True:
+                                        collision.response(circle, neighboring_circle)
+                    else:
+                        circle = circles[0]
+                        for neighboring_cell in neighboring_cells:
+                            n_row, n_column = neighboring_cell
+                            neighboring_circles = self.find_circles_in_a_cell(n_row, n_column)
+                            for neighboring_circle in neighboring_circles:
+                                if collision.check(circle, neighboring_circle) is True:
+                                    collision.response(circle, neighboring_circle)
+            
+    
 class Game:
     @staticmethod
     def setup():
-        r1 = Circle(position=(300, 300), radius=50)
-        r2 = Circle(position=(498, 500), radius=50)
-        r1.linear.velocity[0] = 25
-        r2.linear.velocity[0] = -25
-        r1.linear.velocity[1] = 23
-        r2.linear.velocity[1] = -32
-        circles.elements.append(r1)
-        circles.elements.append(r2)
+        circle_1 = Circle(position=(300, 300), radius=50)
+        circle_2 = Circle(position=(600, 600), radius=50)
+        grid_map.update_keys(circles.elements)
+        grid_map.update_values(circles.elements)
 
     @staticmethod
     def draw_and_update():
@@ -244,6 +286,7 @@ class Game:
 game = Game()
 circles = Circles()
 screen = Screen(background_color=(255, 255, 255), resolution=(1000, 1000))
+grid_map = GridMap(size=(10, 10))  # 20 = 1000 / 50, size = resolution / radius
 transform = Transform()
 collision = Collision()
 game.setup()
@@ -259,8 +302,8 @@ while ON:
         pygame.quit()
         quit()
     screen.FPS.set(60)
-    collision.check_for_screen_borders(circles.elements[0])
-    collision.check_for_screen_borders(circles.elements[1])
-    if collision.check(circles.elements[0], circles.elements[1]) is True:
-        collision.response(circles.elements[0], circles.elements[1])
+    circles.update_all()
+    grid_map.update_values(circles.elements)
+    grid_map.check_collision_for_all()
     game.draw_and_update()
+    
