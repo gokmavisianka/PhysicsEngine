@@ -77,6 +77,7 @@ def normals(Object):
 
 class Collision:
     def check(self, A, B):
+        # Check if two circles are overlapping.
         N = normal(B.linear.position, A.linear.position)
         distance = hypotenuse(*N)
         minimum_required_distance_for_collision = A.radius + B.radius
@@ -86,6 +87,7 @@ class Collision:
             return False
 
     def check_for_screen_borders(self, Object, elasticity=1):
+        # Check if the circle collided with screen borders.
         x, y = Object.linear.position
         if x - Object.radius <= 0:
             Object.linear.position[0] = Object.radius
@@ -102,13 +104,24 @@ class Collision:
             
     @staticmethod
     def response(A, B, elasticity=1):
+        # To resolve the circles:
+        Ax, Ay = A.linear.position
+        Bx, By = B.linear.position
+        angle = math.atan2(By - Ay, Bx - Ax);
+        radii_sum = A.radius + B.radius
+        distance_between_circles = math.sqrt((Bx - Ax) **2 + (By - Ay) ** 2)
+        distance_to_move = radii_sum - distance_between_circles
+        # Note that, only the position of the B (second circle) is changed.
+        # The purpose is to keep it simple.
+        B.linear.position[0] += (math.cos(angle) * distance_to_move)
+        B.linear.position[1] += (math.sin(angle) * distance_to_move)
+        # Now, let's update the velocities of the both circles.
         # V: relative velocity, J: impulse, N: normal.
         V = relative(A.linear.velocity, B.linear.velocity)
         N = normal(B.linear.position, A.linear.position)
         J = -(1 + elasticity)*np.dot(V, N)/((1/A.mass + 1/B.mass)*np.dot(N, N))
         A.linear.velocity += np.dot(J, N) / A.mass
         B.linear.velocity -= np.dot(J, N) / B.mass
-
 
 class Air:
     def __init__(self):
@@ -187,7 +200,7 @@ class Circle:
     def __init__(self, position, radius, color=(0, 50, 200)):
         self.linear = Linear()
         self.linear.position[:] = position
-        self.linear.velocity[:] = (randint(-10, 10), randint(-10, 10))
+        self.linear.velocity[:] = (randint(-20, 20), randint(-20, 20))
         self.radius = radius
         self.color = random_color()
         self.mass = 1
@@ -237,6 +250,9 @@ class GridMap:
         return circles
 
     def check_collision_for_all(self):
+        # This function is used to apply collision check for all the circles.
+        # If the neighboring circles are empty for a cell which includes only one circle,
+        # Then there won't be any collision check to reduce the cost.
         for circle in self.dictionary:
             collision.check_for_screen_borders(circle)
         for row in range(self.rows):
@@ -265,13 +281,26 @@ class GridMap:
                             for neighboring_circle in neighboring_circles:
                                 if collision.check(circle, neighboring_circle) is True:
                                     collision.response(circle, neighboring_circle)
-            
+
+    def alternate_check_collision_for_all(self):
+        # This function will be super expensive for high amount of circles.
+        for circle in circles.elements:
+            collision.check_for_screen_borders(circle)
+
+        for circle_1 in circles.elements:
+            for circle_2 in circles.elements:
+                if circle_1 != circle_2:
+                    if collision.check(circle_1, circle_2) is True:
+                        collision.response(circle_1, circle_2)
+
     
 class Game:
     @staticmethod
     def setup():
-        circle_1 = Circle(position=(300, 300), radius=50)
-        circle_2 = Circle(position=(600, 600), radius=50)
+        count = 16  # perfect square numbers recommended.
+        for x in range(50, 950, round(900 / math.sqrt(count))):
+            for y in range(50, 950, round(900 / math.sqrt(count))):
+                circle = Circle(position=(x, y), radius=50)
         grid_map.update_keys(circles.elements)
         grid_map.update_values(circles.elements)
 
